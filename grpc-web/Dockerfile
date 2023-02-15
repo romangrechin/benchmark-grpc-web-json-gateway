@@ -1,4 +1,8 @@
-FROM node:8.17.0-alpine3.10
+FROM node:19-alpine
+ENV NODE_ENV=production
 
-ADD . /app
-CMD node /app/bench.js
+WORKDIR /app
+COPY ["package.json", "package-lock.json*", "./"]
+RUN npm install
+COPY . .
+CMD [ "node", "bench.js" ]

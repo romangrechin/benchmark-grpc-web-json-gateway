@@ -1,10 +1,8 @@
-module grpc-gateway
+module grpc-server
 
 go 1.19
 
 require (
-	github.com/golang/glog v1.0.0
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.15.0
 	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1

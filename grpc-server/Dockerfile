@@ -13,11 +13,11 @@ COPY . /app/
 
 
 WORKDIR /app
-# Build the grpc_client
-RUN go build -o grpc_client
+# Build the grpc-server
+RUN go build -o grpc-server
 
 FROM alpine:latest
 WORKDIR /app
-COPY --from=build /app/grpc_client /app/
+COPY --from=build /app/grpc-server /app/
 
-CMD ["/app/grpc_client"]
+CMD ["/app/grpc-server"]

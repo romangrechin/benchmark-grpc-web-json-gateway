@@ -1,6 +1,7 @@
-FROM envoyproxy/envoy:latest
+FROM envoyproxy/envoy:v1.22-latest
 
 COPY ./envoy.yaml /etc/envoy/envoy.yaml
+COPY ./proto.pb /etc/envoy/proto.pb
 
 EXPOSE 8080
 

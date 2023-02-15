@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"grpc-client/pkg"
 	"log"
 	"sync"
@@ -11,46 +12,34 @@ import (
 )
 
 func main() {
-	request := &pkg.PingRequest{}
-
 	target := "bench-server:6790"
-	conn, err := grpc.Dial(target, grpc.WithInsecure())
+	conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	if err != nil {
 		log.Fatal("error request", err)
 	}
 	defer conn.Close()
 
-	start := makeTimestamp()
+	start := time.Now()
 	server := pkg.NewCoreServiceClient(conn)
 	lock := &sync.WaitGroup{}
 
 	total := int64(50000)
-
 	for i := int64(0); i < total; i++ {
 		lock.Add(1)
-
 		go func() {
-			_, error := server.Ping(context.Background(), request)
-
-			if error != nil {
-				log.Print(error)
+			request := &pkg.PingRequest{}
+			_, err := server.Ping(context.Background(), request)
+			if err != nil {
+				log.Print(err)
 			}
-
 			lock.Done()
 		}()
-
-		//log.Print(response)
 	}
-
 	lock.Wait()
 
-	execTime := (makeTimestamp() - start)
-	fmt.Println("Benchmark result for ", total, " request in ", execTime," microsecond")
-	fmt.Println("Throughtput :", total * 1000000/ execTime, "req/s" )
-	fmt.Println("Latency :", execTime / total, "microsecond")  
-}
-
-func makeTimestamp() int64 {
-	return time.Now().UnixNano() / 1000
+	execTime := time.Now().Sub(start)
+	fmt.Printf("Benchmark result for %d request in %0.2f ms\n", total, execTime.Seconds())
+	fmt.Printf("Throughtput : %d req/s\n", total*1000000/execTime.Microseconds())
+	fmt.Printf("Latency : %d ms\n", execTime.Microseconds()/total)
 }

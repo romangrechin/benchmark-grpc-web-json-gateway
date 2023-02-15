@@ -1,7 +1,4 @@
-# Template for grpc-gateway 
-
-ARG alpine_version=3.11
-FROM golang:1.12.14-alpine$alpine_version AS build
+FROM golang:1.20-alpine AS build
 
 RUN apk add --update --no-cache git
 WORKDIR /app
@@ -20,14 +17,11 @@ COPY . /app/
 
 WORKDIR /app
 # Build the gateway
-
 RUN go build -o grpc_gateway
 
-FROM alpine:$alpine_version
+FROM alpine:latest
 WORKDIR /app
 COPY --from=build /app/grpc_gateway /app/
-COPY --from=build /app/config.yaml /app/
-COPY --from=build /app/pkg/ping.swagger.json /app/
 
-EXPOSE 80
+EXPOSE 8081
 CMD ["/app/grpc_gateway"]

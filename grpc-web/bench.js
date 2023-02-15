@@ -1,95 +1,108 @@
-var Benchmarkify = require("benchmarkify");
-var KeepAliveAgent = require('keep-alive-agent');
-var request = require('request');
+let Benchmarkify = require("benchmarkify");
+let KeepAliveAgent = require('keep-alive-agent');
+let request = require('request');
 const {PingRequest} = require('./ping_pb.js');
 const {CoreServiceClient: CoreServiceClient} = require('./ping_grpc_web_pb.js');
 const {CoreServiceClient: CoreServiceClientBinary} = require('./ping_grpc_web_pb.js');
 
-var benchmark = new Benchmarkify("Benchmark: gRPC-Web vs grpc-gateway vs spring-http-base-grpc").printHeader();
-
-// config
-
-var benchmarkTime = 30000
+let benchmark = new Benchmarkify("Benchmark: HTTP JSON vs gRPC-gateway vs gRPC-JSON transcoding vs gRPC-Web").printHeader();
+let benchmarkTime = 30000
 if (process.env.BENCHMARK_TIME) {
-  benchmarkTime = process.env.BENCHMARK_TIME;
+    benchmarkTime = process.env.BENCHMARK_TIME;
 }
 
-// var target = {
-//     backend: 'http://localhost:6789/api/ping',
-//     gateway: 'http://localhost:8800/ping/123',
-//     envoy: 'http://localhost:8080',
-// };
-
-var target = {
-  backend: 'http://bench-server:6789/api/ping',
-  gateway: 'http://grpc-gateway:80/ping/123',
-  envoy: 'http://bench-envoy:8080',
+let target = {
+    backend: 'http://bench-server:6789/ping',
+    gateway: 'http://grpc-gateway:8081/ping/111',
+    envoy: 'http://bench-envoy:8080',
+    envoy_backend: 'http://bench-envoy:8080/api/ping',
+    envoy_gateway: 'http://bench-envoy:8080/gw/ping/111',
+    envoy_transcoding: 'http://bench-envoy:8080/ping/111',
 };
 
 console.log("Run test with time: " + benchmarkTime + " ms")
 
 // init benchmark service
-var bench = benchmark.createSuite("Call HTTP", {time: benchmarkTime});
-
+let bench = benchmark.createSuite("API benchmarking", {time: benchmarkTime});
 
 // set xhr2 to nodeJs can call gRPC-Web
 global.XMLHttpRequest = require('xhr2');
-var agent = new KeepAliveAgent({maxSockets: 1});
 
-var options = {
-    agent: agent,
+// setup request library
+request.defaults({
+    agent: new KeepAliveAgent({maxSockets: 1}),
     headers: {"Connection": "Keep-Alive"}
-};
+});
 
-request.defaults(options);
+let clientText = new CoreServiceClient(target.envoy, null, null);
+let clientBinary = new CoreServiceClientBinary(target.envoy, null, null);
+let pingRequest = new PingRequest();
+pingRequest.setTimestamp(123);
 
-var clientText = new CoreServiceClient(target.envoy, null, null);
-var clientBinary = new CoreServiceClientBinary(target.envoy, null, null);
-
-bench.add("Ping to server", done => {
+bench.add("HTTP JSON", done => {
     request.post(target.backend, {
         json: {
             timestamp: 111
         }
     }, (error, res, body) => {
         if (error) {
-            console.log('error:', error); // Print the error if one occurred
+            console.log('error:', error);
         }
         done();
     });
 });
 
-bench.add("Ping to gateway", done => {
-  request(target.gateway, function (error, response, body) {
-    if (error) {
-      console.log('error:', error); // Print the error if one occurred
-    }
-    done();
-  });
+bench.add("HTTP JSON (envoyproxy)", done => {
+    request.post(target.backend, {
+        json: {
+            timestamp: 111
+        }
+    }, (error, res, body) => {
+        if (error) {
+            console.log('error:', error);
+        }
+        done();
+    });
 });
 
-//===
-
-var pingRequest = new PingRequest();
-pingRequest.setTimestamp(123);
-
-bench.add("Ping with grpc-web text", done => {
-  clientText.ping(pingRequest, {}, (err, response) => {
-      if (err) {
-          console.log(err);
-      } 
-      done();
-  });
+bench.add("gRPC-gateway", done => {
+    request(target.gateway, function (error, response, body) {
+        if (error) {
+            console.log('error:', error);
+        }
+        done();
+    });
 });
 
-// ===
-// var pingRequest = new PingRequest();
-// pingRequest.setTimestamp(123);
+bench.add("gRPC-gateway (envoyproxy)", done => {
+    request(target.envoy_gateway, function (error, response, body) {
+        if (error) {
+            console.log('error:', error);
+        }
+        done();
+    });
+});
 
-// var metadata = {'content-type': 'application/grpc-web+proto'};
-var metadata = {};
-bench.add("Ping with grpc-web binary", done => {
-  clientBinary.ping(pingRequest, metadata, (err, response) => {
+bench.add("gRPC-JSON transcoding (envoyproxy)", done => {
+    request(target.envoy_transcoding, function (error, response, body) {
+        if (error) {
+            console.log('error:', error);
+        }
+        done();
+    });
+});
+
+bench.add("gRPC-Web (envoyproxy; mode=grpcwebtext)", done => {
+    clientText.ping(pingRequest, {}, (err, response) => {
+        if (err) {
+            console.log(err);
+        }
+        done();
+    });
+});
+
+bench.add("gRPC-Web (envoyproxy; mode=grpcweb)", done => {
+    clientBinary.ping(pingRequest, {}, (err, response) => {
         if (err) {
             console.log(err);
         }
